@@ -17,7 +17,7 @@ class Membro {
 
   bool get isStaff => papel == 'staff';
 
-  // Iniciais para o avatar: primeira e última palavra ("Ana Silva" → "AS")
+  // Iniciais para o avatar: primeira e última palavra ("Ana Silva" - "AS")
   String get iniciais {
     final partes = nome.trim().split(RegExp(r'\s+'));
     if (partes.first.isEmpty) return '?';

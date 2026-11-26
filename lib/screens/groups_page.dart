@@ -1,3 +1,5 @@
+import 'package:dja_konta/services/conexao_service.dart';
+import 'package:dja_konta/widgets/faixa_sincronizacao.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dja_konta/services/group_service.dart';
@@ -19,18 +21,46 @@ class GroupsPageState extends State<GroupsPage> {
 
   // Para escrever a data em português sem pacotes extra
   static const _dias = [
-    'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira',
-    'sexta-feira', 'sábado', 'domingo',
+    'segunda-feira',
+    'terça-feira',
+    'quarta-feira',
+    'quinta-feira',
+    'sexta-feira',
+    'sábado',
+    'domingo',
   ];
   static const _meses = [
-    'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-    'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+    'janeiro',
+    'fevereiro',
+    'março',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro',
   ];
 
   @override
   void initState() {
     super.initState();
     _futureGrupos = GroupService.lerGrupos(); // lê uma vez ao abrir o ecrã
+    ConexaoService.online.addListener(_aoMudarLigacao);
+  }
+
+  @override
+  void dispose() {
+    ConexaoService.online.removeListener(_aoMudarLigacao);
+    super.dispose();
+  }
+ 
+
+  //rede volta le grupo again
+  void _aoMudarLigacao(){
+    if(ConexaoService.online.value) _recarregar();
   }
 
   // Volta a ler os grupos (depois de criar/entrar/sair, ou ao puxar para baixo)
@@ -61,9 +91,8 @@ class GroupsPageState extends State<GroupsPage> {
   }
 
   Future<void> _entrarComCodigo() async {
-    final entrou = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const EntrarGrupoPage()),
-    );
+    final entrou = await Navigator.of(context)
+        .push<bool>(MaterialPageRoute(builder: (_) => const EntrarGrupoPage()));
     if (!mounted) return;
     if (entrou == true) {
       _recarregar();
@@ -71,11 +100,11 @@ class GroupsPageState extends State<GroupsPage> {
     }
   }
 
-  // Abre os itens; ao voltar, recarrega sempre (os números podem ter mudado)
+  // Abre os itens ao voltar, recarrega sempre (os números podem ter mudado)
   Future<void> _abrirGrupo(Grupo grupo) async {
-    final resultado = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => ItensPage(grupo: grupo)),
-    );
+    final resultado = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => ItensPage(grupo: grupo)));
     if (!mounted) return;
     await _recarregar();
     if (!mounted) return;
@@ -119,83 +148,99 @@ class GroupsPageState extends State<GroupsPage> {
           IconButton(
             tooltip: 'Perfil',
             icon: const Icon(Icons.account_circle_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProfilePage()),
-            ),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const ProfilePage())),
           ),
         ],
       ),
 
       // Conteúdo: a carregar / vazio / lista
-      body: FutureBuilder<List<Grupo>>(
-        future: _futureGrupos,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Column(
+        children: [
+          const FaixaSincronizacao(),
+          Expanded(
+            child: FutureBuilder<List<Grupo>>(
+              future: _futureGrupos,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final grupos = snapshot.data ?? [];
+                final grupos = snapshot.data ?? [];
 
-          // Sem grupos: estado vazio com os botões no meio
-          if (grupos.isEmpty) {
-            return RefreshIndicator(
-              onRefresh: _recarregar,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
-                children: [
-                  Container(
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: cores.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
+                // Sem grupos: estado vazio com os botões no meio
+                if (grupos.isEmpty) {
+                  return RefreshIndicator(
+                    onRefresh: _recarregar,
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(24, 120, 24, 24),
+                      children: [
+                        Container(
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: cores.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            Icons.inventory_2_outlined,
+                            size: 64,
+                            color: cores.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Ainda não pertence\na nenhum grupo',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Cada grupo é um inventário partilhado. Crie um novo ou entre num existente com um código de convite.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: cores.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _botoes(),
+                      ],
                     ),
-                    child: Icon(Icons.inventory_2_outlined,
-                        size: 64, color: cores.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Ainda não pertence\na nenhum grupo',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Cada grupo é um inventário partilhado. Crie um novo ou entre num existente com um código de convite.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16, color: cores.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 24),
-                  _botoes(),
-                ],
-              ),
-            );
-          }
+                  );
+                }
 
-          // Com grupos: cabeçalho + cartões + botões fixos em baixo
-          return Column(
-            children: [
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _recarregar,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _cabecalho(grupos, cores),
-                      for (final grupo in grupos) _cartaoGrupo(grupo, cores),
-                    ],
-                  ),
-                ),
-              ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 5, 16, 16),
-                  child: _botoes(),
-                ),
-              ),
-            ],
-          );
-        },
+                // Com grupos: cabeçalho + cartões + botões fixos em baixo
+                return Column(
+                  children: [
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _recarregar,
+                        child: ListView(
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            _cabecalho(grupos, cores),
+                            for (final grupo in grupos)
+                              _cartaoGrupo(grupo, cores),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 5, 16, 16),
+                        child: _botoes(),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -206,7 +251,8 @@ class GroupsPageState extends State<GroupsPage> {
     final primeiroNome = nomeCompleto.trim().split(RegExp(r'\s+')).first;
 
     final hoje = DateTime.now();
-    final data = '${_dias[hoje.weekday - 1]}, ${hoje.day} de ${_meses[hoje.month - 1]}';
+    final data =
+        '${_dias[hoje.weekday - 1]}, ${hoje.day} de ${_meses[hoje.month - 1]}';
 
     // Soma o stock baixo de todos os grupos
     final totalBaixos = grupos.fold<int>(0, (soma, g) => soma + g.nBaixos);
@@ -216,7 +262,10 @@ class GroupsPageState extends State<GroupsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(data, style: TextStyle(fontSize: 13, color: cores.onSurfaceVariant)),
+          Text(
+            data,
+            style: TextStyle(fontSize: 13, color: cores.onSurfaceVariant),
+          ),
           const SizedBox(height: 4),
           Text(
             primeiroNome.isEmpty ? 'Olá!' : 'Olá, $primeiroNome',
@@ -228,12 +277,16 @@ class GroupsPageState extends State<GroupsPage> {
               style: TextStyle(fontSize: 14, color: cores.onSurfaceVariant),
               children: [
                 TextSpan(
-                  text: '${grupos.length} ${grupos.length == 1 ? 'grupo' : 'grupos'}',
+                  text:
+                      '${grupos.length} ${grupos.length == 1 ? 'grupo' : 'grupos'}',
                 ),
                 if (totalBaixos > 0)
                   TextSpan(
                     text: ' · $totalBaixos com stock baixo',
-                    style: TextStyle(color: cores.primary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: cores.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
               ],
             ),
@@ -257,8 +310,9 @@ class GroupsPageState extends State<GroupsPage> {
   Widget _cartaoGrupo(Grupo grupo, ColorScheme cores) {
     final stock = grupo.tipo == 'stock';
     final tipoTexto = stock ? 'Loja' : 'Sala';
-    final linha2 =
-        grupo.localizacao != null ? '$tipoTexto · ${grupo.localizacao}' : tipoTexto;
+    final linha2 = grupo.localizacao != null
+        ? '$tipoTexto · ${grupo.localizacao}'
+        : tipoTexto;
     final palavraItens = stock
         ? (grupo.nItens == 1 ? 'produto' : 'produtos')
         : (grupo.nItens == 1 ? 'item' : 'itens');
@@ -291,7 +345,9 @@ class GroupsPageState extends State<GroupsPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        stock ? Icons.storefront_outlined : Icons.meeting_room_outlined,
+                        stock
+                            ? Icons.storefront_outlined
+                            : Icons.meeting_room_outlined,
                         color: cores.onSurfaceVariant,
                       ),
                     ),
@@ -303,7 +359,9 @@ class GroupsPageState extends State<GroupsPage> {
                           Text(
                             grupo.nome,
                             style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -311,7 +369,9 @@ class GroupsPageState extends State<GroupsPage> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis, // corta com "..."
                             style: TextStyle(
-                                fontSize: 13, color: cores.onSurfaceVariant),
+                              fontSize: 13,
+                              color: cores.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ),
@@ -325,13 +385,17 @@ class GroupsPageState extends State<GroupsPage> {
                 // Quantos itens e quantos membros
                 Row(
                   children: [
-                    _indicador(Icons.inventory_2_outlined,
-                        '${grupo.nItens} $palavraItens', cores),
+                    _indicador(
+                      Icons.inventory_2_outlined,
+                      '${grupo.nItens} $palavraItens',
+                      cores,
+                    ),
                     const SizedBox(width: 16),
                     _indicador(
-                        Icons.group_outlined,
-                        '${grupo.nMembros} ${grupo.nMembros == 1 ? 'membro' : 'membros'}',
-                        cores),
+                      Icons.group_outlined,
+                      '${grupo.nMembros} ${grupo.nMembros == 1 ? 'membro' : 'membros'}',
+                      cores,
+                    ),
                   ],
                 ),
 
@@ -340,14 +404,21 @@ class GroupsPageState extends State<GroupsPage> {
                   const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       border: Border.all(color: cores.primary),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, size: 16, color: cores.primary),
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: cores.primary,
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           '${grupo.nBaixos} com stock baixo',
@@ -376,7 +447,10 @@ class GroupsPageState extends State<GroupsPage> {
       children: [
         Icon(icone, size: 16, color: cores.onSurfaceVariant),
         const SizedBox(width: 4),
-        Text(texto, style: TextStyle(fontSize: 13, color: cores.onSurfaceVariant)),
+        Text(
+          texto,
+          style: TextStyle(fontSize: 13, color: cores.onSurfaceVariant),
+        ),
       ],
     );
   }
@@ -389,7 +463,10 @@ class GroupsPageState extends State<GroupsPage> {
         border: Border.all(color: cores.outline),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(papel, style: TextStyle(fontSize: 12, color: cores.onSurface)),
+      child: Text(
+        papel,
+        style: TextStyle(fontSize: 12, color: cores.onSurface),
+      ),
     );
   }
 }

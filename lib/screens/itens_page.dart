@@ -1,4 +1,5 @@
 import 'package:dja_konta/screens/item_form_page.dart';
+import 'package:dja_konta/widgets/faixa_sincronizacao.dart';
 import 'package:dja_konta/widgets/item_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:dja_konta/models/grupo.dart';
@@ -204,7 +205,7 @@ class ItensPageState extends State<ItensPage> {
           ),
           body: Column(
             children: [
-              // TODO: faixa "Sem ligação · N alterações por sincronizar" (RF5.3)
+              const FaixaSincronizacao(),
               _pesquisaCampo(cores),
               Expanded(child: _conteudo(snapshot, cores)),
             ],

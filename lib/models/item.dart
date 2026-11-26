@@ -37,4 +37,25 @@ class Item {
       atualizadoPor: snap.child('atualizadoPor').value as String,
     );
   }
+
+  // Linha do SQLite p Item
+  factory Item.fromMap(Map<String, Object?> m) => Item(
+    codigo: m['codigo'] as String,
+    nome: m['nome'] as String,
+    quantidade: m['quantidade'] as int,
+    quantidadeMinima: m['quantidadeMinima'] as int?,
+    atualizadoEm: m['atualizadoEm'] as int,
+    atualizadoPor: m['atualizadoPor'] as String,
+  );
+
+  // Item p linha do SQLite
+  Map<String, Object?> toMap(String grupoId) => {
+    'grupoId': grupoId,
+    'codigo': codigo,
+    'nome': nome,
+    'quantidade': quantidade,
+    'quantidadeMinima': quantidadeMinima,
+    'atualizadoEm': atualizadoEm,
+    'atualizadoPor': atualizadoPor,
+  };
 }

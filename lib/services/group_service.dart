@@ -3,10 +3,37 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'; // debugPrint
 import 'package:dja_konta/models/grupo.dart';
 import 'package:dja_konta/models/item.dart';
+import 'package:dja_konta/data/local_db.dart';
+import 'dart:async';
+import 'conexao_service.dart';
+
 
 class GroupService {
   // Quanto tempo um convite é válido (as regras também verificam)
   static const validadeConvite = Duration(days: 7);
+
+  static Future<List<Grupo>> _lerGruposCache() async {
+    final db = await LocalDb.db;
+    final linhas = await db.query(
+      'grupos',
+    );
+    debugPrint('Cache grupos: li ${linhas.length}');
+    return linhas.map(Grupo.fromMap).toList();
+  }
+
+  static Future<void> _guardarGruposCache(List<Grupo> grupos) async {
+    debugPrint('Cache grupos: A GUARDAR ${grupos.length}');
+    final db = await LocalDb.db;
+    await db.transaction((txn) async {
+      await txn.delete('grupos');
+      final lote = txn.batch();
+      for (final grupo in grupos) {
+        lote.insert('grupos', grupo.toMap());
+      }
+      await lote.commit(noResult: true);
+    });
+  }
+
 
   //criar grupo
   static Future<String?> criarGrupo({
@@ -18,6 +45,10 @@ class GroupService {
       final user = FirebaseAuth.instance.currentUser; // User? (pode ser null)
       if (user == null) return 'Sessão expirada. Entre novamente.';
       final uid = user.uid; // o identificador do utilizador
+
+      if (!ConexaoService.online.value) {
+        return 'Sem ligação. Esta ação precisa de internet.';
+      }
 
       final ref = FirebaseDatabase.instance.ref();
 
@@ -55,24 +86,37 @@ class GroupService {
     }
   }
 
-  //ler grupos
+  //ler grupos com o resumo de itens, stock baixo e membros
+  // Com rede: lê do Firebase e guarda no SQLite Sem rede: usa o SQLite.
   static Future<List<Grupo>> lerGrupos() async {
     try {
       final user = FirebaseAuth.instance.currentUser; // User? (pode ser null)
       if (user == null) return [];
       final uid = user.uid;
 
+      // Sem rede: nem tenta o Firebase, mostra a última cópia guardada
+      if (!ConexaoService.online.value) return _lerGruposCache();
+
       final ref = FirebaseDatabase.instance.ref();
 
-      final snap = await ref.child('gruposUtilizador/$uid').get();
-      if (!snap.exists) return [];
+      // Se a rede não responder em 10 s, desiste (cai no catch - cache)
+      final snap = await ref
+          .child('gruposUtilizador/$uid')
+          .get()
+          .timeout(const Duration(seconds: 10));
+
+      // Não pertence a nenhum grupo: a cópia local também fica vazia
+      if (!snap.exists) {
+        await _guardarGruposCache([]);
+        return [];
+      }
 
       final grupos = <Grupo>[];
 
       for (final filho in snap.children) {
         final grupoId = filho.key!; // o id do grupo (a chave em gruposUtilizador)
 
-        // Lê primeiro o papel: se não existir, já não é membro deste grupo
+        // Lê primeiro o papel, se não existir, já não é membro deste grupo
         final papelSnap = await ref.child('membros/$grupoId/$uid/papel').get();
         if (!papelSnap.exists) continue;
 
@@ -90,7 +134,6 @@ class GroupService {
         // Resumo: quantos membros
         final membrosSnap = await ref.child('membros/$grupoId').get();
 
-
         grupos.add(
           Grupo(
             id: grupoId,
@@ -105,10 +148,13 @@ class GroupService {
         );
       }
 
+      // Guarda para a próxima vez que abrir sem rede
+      await _guardarGruposCache(grupos);
       return grupos;
     } catch (e) {
-      debugPrint('Erro em lerGrupos: $e');
-      return []; // em caso de erro, mostra a lista vazia
+      // Sem rede, timeout ou erro do Firebase: mostra a última cópia guardada
+      debugPrint('lerGrupos: a usar a cópia local ($e)');
+      return _lerGruposCache();
     }
   }
 
@@ -118,6 +164,10 @@ class GroupService {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return 'Sessão expirada. Entre novamente.';
       final uid = user.uid;
+
+      if (!ConexaoService.online.value) {
+        return 'Sem ligação. Esta ação precisa de internet.';
+      }
 
       final ref = FirebaseDatabase.instance.ref();
 
