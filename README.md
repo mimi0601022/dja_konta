@@ -45,8 +45,8 @@ Antes de sair da conta, a app avisa se ainda há alterações por sincronizar.
 Precisas do [Flutter](https://docs.flutter.dev/get-started/install) instalado e de um projeto Firebase teu.
 
 ```bash
-git clone https://github.com/mimi0601022/NOME_DO_REPOSITORIO.git
-cd NOME_DO_REPOSITORIO
+git clone https://github.com/mimi0601022/dja_konta.git
+cd dja_konta
 flutter pub get
 flutterfire configure
 flutter run
