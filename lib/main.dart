@@ -1,3 +1,5 @@
+import 'package:dja_konta/services/conexao_service.dart';
+import 'package:dja_konta/services/sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -7,9 +9,30 @@ import 'screens/groups_page.dart';
 import 'screens/login_page.dart';
 import 'screens/verificar_email_page.dart';
 
+final mensageiro = GlobalKey<ScaffoldMessengerState>(); //para ser em todos los ecras
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  ConexaoService.iniciar();// começa a vigiar a ligação
+  ConexaoService.online.addListener(() {
+    debugPrint('Ligação: ${ConexaoService.online.value}');
+  });
+ 
+  SyncService.iniciar();// envia a fila quando houver rede
+
+  // Avisos da reconciliação: mostra-os no ecrã que estiver aberto
+  SyncService.aviso.addListener((){
+    final texto = SyncService.aviso.value;
+    if(texto == null) return;
+
+    mensageiro.currentState?.showSnackBar(
+      SnackBar(content: Text(texto)),
+    );
+    SyncService.aviso.value = null; // limpa, para o próximo aviso contar como novo
+  });
+  
   runApp(const MyApp());
 }
 
@@ -19,6 +42,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: mensageiro,
       title: 'Dja Konta?',
       debugShowCheckedModeBanner: false, // tira a faixa "DEBUG"
       theme: ThemeData(

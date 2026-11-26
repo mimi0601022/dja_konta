@@ -185,7 +185,7 @@ class MembroService {
       if (e.code == 'permission-denied') return 'Só o staff pode gerar convites.';
       return 'Não foi possível gerar convite. Tente novamente.';
     }catch (e) {
-      return 'Ocorreu um erro inesperado. Tente novamente.; // sem convite visível: o ecrã mostra "Gerar código';
+      return 'Ocorreu um erro inesperado. Tente novamente.'; // sem convite visível: o ecrã mostra "Gerar código;
     }
   }
 }

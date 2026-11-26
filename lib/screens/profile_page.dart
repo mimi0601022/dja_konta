@@ -1,8 +1,10 @@
+import 'package:dja_konta/services/sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:dja_konta/models/grupo.dart';
 import 'package:dja_konta/services/auth_service.dart';
 import 'package:dja_konta/screens/gestao_grupo_page.dart';
+import 'package:dja_konta/data/local_db.dart';
 
 // Perfil do utilizador.
 // Se vier um grupo (aberto a partir dos itens), mostra o "Grupo ativo",
@@ -27,10 +29,43 @@ class ProfilePageState extends State<ProfilePage> {
     return (partes.first[0] + partes.last[0]).toUpperCase();
   }
 
-  Future<void> _terminarSessao() async {
+    Future<void> _terminarSessao() async {
+    // 1. Há alterações por enviar? Avisa antes de sair
+    final n = SyncService.pendentes.value;
+    if (n > 0) {
+      final palavra = n == 1 ? 'alteração que ainda não foi enviada' : 'alterações que ainda não foram enviadas';
+      final sair = await showDialog<bool>(
+        context: context,
+        builder: (contextDialogo) => AlertDialog(
+          title: const Text('Alterações por sincronizar'),
+          content: Text(
+            'Tem $n $palavra. Se terminar a sessão agora, perdem-se. '
+            'Ligue-se à internet e espere que a faixa desapareça.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(contextDialogo, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(contextDialogo, true),
+              child: const Text('Sair mesmo assim'),
+            ),
+          ],
+        ),
+      );
+      if (sair != true || !mounted) return;
+    }
+
     setState(() {
       _aSair = true;
     });
+
+    // 2. Apaga os dados locais eram deste utilizador
+    await LocalDb.limpar();
+    await SyncService.atualizar(); // a faixa volta a 0
+
+    // 3. Termina a sessão
     await AuthService.signOut();
     if (!mounted) return;
     // O perfil está por cima de outros ecrãs: fecha tudo até ao ecrã base

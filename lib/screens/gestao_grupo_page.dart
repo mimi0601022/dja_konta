@@ -8,6 +8,7 @@ import 'package:dja_konta/models/membro.dart';
 import 'package:dja_konta/models/convite.dart';
 import 'package:dja_konta/services/membro_service.dart';
 import 'package:dja_konta/widgets/membro_sheet.dart';
+import 'package:dja_konta/services/conexao_service.dart';
 
 
 // Gestão do grupo: convite (só staff), membros e sair
@@ -36,6 +37,24 @@ class GestaoGrupoPageState extends State<GestaoGrupoPage> {
     if (widget.grupo.isStaff) {
       _futureConvite = MembroService.obterConvite(widget.grupo.id);
     }
+
+    // Quando a rede voltar, volta a ler o convite
+    ConexaoService.online.addListener(_aoMudarLigacao);
+  }
+
+  @override
+  void dispose() {
+    ConexaoService.online.removeListener(_aoMudarLigacao);
+    super.dispose();
+  }
+
+  // A rede voltou: volta a ler o convite os membros voltam sozinhos pelo stream
+  void _aoMudarLigacao() {
+    if (ConexaoService.online.value && widget.grupo.isStaff) {
+      setState(() {
+        _futureConvite = MembroService.obterConvite(widget.grupo.id);
+      });
+    }
   }
 
   void _aviso(String texto) {
@@ -43,7 +62,6 @@ class GestaoGrupoPageState extends State<GestaoGrupoPage> {
   }
 
   //Convite 
-
   Future<void> _copiar(Convite convite) async {
     await Clipboard.setData(ClipboardData(text: convite.formatado));
     if (!mounted) return;
@@ -137,6 +155,7 @@ class GestaoGrupoPageState extends State<GestaoGrupoPage> {
     if (!mounted) return;
     if (erro != null) _aviso(erro);
   }
+  
 
   Future<void> _sair() async {
     final cores = Theme.of(context).colorScheme;
@@ -273,65 +292,74 @@ class GestaoGrupoPageState extends State<GestaoGrupoPage> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<List<Membro>>(
-              stream: _streamMembros,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Center(
-                    child: Text('Não foi possível carregar os membros.'),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
 
-                _membros = snapshot.data!;
 
-                return ListView(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  children: [
-                    // Convite (só staff)
-                    if (staff) ...[
-                      _titulo('CÓDIGO DE CONVITE', cores),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: _cartaoConvite(cores),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+      body: ValueListenableBuilder<bool>(
+        valueListenable: ConexaoService.online,
+        builder: (context, online, _) {
+          if (!online) return _semLigacao(cores);
 
-                    // Membros
-                    _titulo('MEMBROS · ${_membros.length}', cores),
-                    for (var i = 0; i < _membros.length; i++) ...[
-                      if (i > 0) const Divider(height: 1, indent: 72),
-                      _linhaMembro(_membros[i], cores),
-                    ],
-                  ],
-                );
-              },
-            ),
-          ),
+          return Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<List<Membro>>(
+                  stream: _streamMembros,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text('Não foi possível carregar os membros.'),
+                      );
+                    }
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-          // Sair do grupo (todos)
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  foregroundColor: cores.error,
-                  side: BorderSide(color: cores.error),
+                    _membros = snapshot.data!;
+
+                    return ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        // Convite (só staff)
+                        if (staff) ...[
+                          _titulo('CÓDIGO DE CONVITE', cores),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: _cartaoConvite(cores),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Membros
+                        _titulo('MEMBROS · ${_membros.length}', cores),
+                        for (var i = 0; i < _membros.length; i++) ...[
+                          if (i > 0) const Divider(height: 1, indent: 72),
+                          _linhaMembro(_membros[i], cores),
+                        ],
+                      ],
+                    );
+                  },
                 ),
-                onPressed: _aSair ? null : _sair,
-                icon: const Icon(Icons.logout),
-                label: const Text('Sair do grupo'),
               ),
-            ),
-          ),
-        ],
+
+              // Sair do grupo (todos)
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      foregroundColor: cores.error,
+                      side: BorderSide(color: cores.error),
+                    ),
+                    onPressed: _aSair ? null : _sair,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sair do grupo'),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -477,6 +505,35 @@ class GestaoGrupoPageState extends State<GestaoGrupoPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // Mostrado quando não há rede 
+  Widget _semLigacao(ColorScheme cores) {
+    return Align(
+      alignment: const Alignment(0, -0.5),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_outlined, size: 64, color: cores.onSurfaceVariant),
+            const SizedBox(height: 16),
+            const Text(
+              'Sem ligação',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'A gestão do grupo precisa de ligação à internet. '
+              'Os itens continuam disponíveis sem rede.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: cores.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
     );
   }
