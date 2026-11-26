@@ -1,10 +1,14 @@
 # Dja Konta?
 
+**Inventário partilhado, sempre contado.**
+
 Aplicação móvel para gerir inventários partilhados. O utilizador lê o código de barras de um produto com a câmara e vê ou altera a quantidade. As alterações chegam aos outros membros em tempo real e podem ser feitas sem rede.
 
 O nome vem do crioulo cabo-verdiano: *Dja konta?* significa "Já contaste?".
 
-Projeto da unidade curricular de Computação Móvel (Mestrado em Informática, ESTGD, Politécnico de Portalegre), opção D: Inventário Simples com Scanner.
+<p align="center">
+  <img src="docs/demo.gif" alt="Demonstração do scanner e das ações rápidas" width="280">
+</p>
 
 ## Funcionalidades
 
@@ -14,7 +18,18 @@ Projeto da unidade curricular de Computação Móvel (Mestrado em Informática, 
 - Convites com código de seis caracteres, válidos durante sete dias, que podem ser escritos, lidos por QR ou partilhados.
 - Leitura de códigos de barras e QR, com uma folha inferior de ações rápidas (+1, −1 e editar).
 - Lista de itens em tempo real, com pesquisa e aviso de stock baixo.
-- **Modo offline:** as alterações ficam numa fila em SQLite e são enviadas quando a ligação volta. As quantidades são enviadas como incrementos, para que as alterações de vários dispositivos se somem.
+- **Modo offline**, explicado abaixo.
+
+## Como funciona o modo offline
+
+A aplicação guarda os grupos e os itens numa cache em SQLite. Cada alteração feita sem rede entra numa fila de operações, também em SQLite.
+
+Quando a ligação volta, detetada através do `.info/connected` do Firebase, o serviço de sincronização processa a fila pela ordem em que as alterações foram feitas:
+
+- **+1 e −1** são enviados como incrementos e não como valores finais. Se dois dispositivos mexerem no mesmo item ao mesmo tempo, as alterações somam-se em vez de uma apagar a outra.
+- **Criar e editar** verificam primeiro se o item ainda existe no servidor.
+
+Uma faixa no topo do ecrã mostra quando há alterações por sincronizar.
 
 ## Tecnologias
 
@@ -53,6 +68,10 @@ Os ficheiros de configuração do Firebase não estão no repositório. Para cor
    flutter run
    ```
 
+## Contexto
+
+Projeto da unidade curricular de Computação Móvel do Mestrado em Informática da ESTGD, Politécnico de Portalegre.
+
 ## Autora
 
-Miriam Pina, 2026
+**Miriam Pina**, 2026 · [Portfólio](https://miriampina.vercel.app/) · [LinkedIn](https://linkedin.com/in/miriiampina)
